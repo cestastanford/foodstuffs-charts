@@ -45,14 +45,15 @@
   <div class="small-12 columns" id="timechart"></div>
 
 <script>
-var csvpath = "/data/birds.combined.csv";
+var csvpath = "/data/birds_transformed.csv";
 
 var legendWidth = 120;
 
 var margin = {top: 20, right: 20, bottom: 30, left: 60},
     width = 860 - margin.left - margin.right+legendWidth,
     height = 500 - margin.top - margin.bottom,
-    time_chart_height = 150 - margin.top - margin.bottom;
+    time_chart_height = 150 - margin.top - margin.bottom,
+    parseDate = d3.time.format("%Y").parse;
 
 var xscale = d3.scale.ordinal()
   .rangeRoundBands([0, width], 0.1);
@@ -61,7 +62,7 @@ var yscale = d3.scale.linear()
   .rangeRound([height, 0]);
 
 var colors = d3.scale.ordinal()
-    .range(["#1f77b4","#aec7e8","#ff7f0e","#ffbb78","#2ca02c","#98df8a","#d62728","#ff9896","#9467bd","#c5b0d5","#8c564b","#c49c94","#e377c2","#f7b6d2","#7f7f7f","#c7c7c7","#bcbd22","#dbdb8d","#17becf","#9edae5","#393b79","#5254a3","#6b6ecf","#9c9ede","#637939","#8ca252","#b5cf6b","#cedb9c","#8c6d31","#bd9e39","#e7ba52","#e7cb94","#843c39","#ad494a","#d6616b","#e7969c","#7b4173","#a55194","#ce6dbd","#de9ed6"]);
+    .range(["#1f77b4","#aec7e8","#ff7f0e","#ffbb78","#2ca02c","#98df8a","#d62728","#ff9896","#9467bd","#c5b0d5","#8c564b","#c49c94","#e377c2","#f7b6d2","#7f7f7f","#c7c7c7","#bcbd22","#dbdb8d","#17becf","#9edae5","#393b79","#5254a3","#6b6ecf","#9c9ede","#637939","#8ca252","#b5cf6b","#cedb9c","#8c6d31","#bd9e39","#e7ba52","#e7cb94","#843c39","#ad494a","#d66z16b","#e7969c","#7b4173","#a55194","#ce6dbd","#de9ed6"]);
 
 var xaxis = d3.svg.axis()
   .scale(xscale)
@@ -78,8 +79,8 @@ var svg = d3.select("#mainchart").append("svg")
   .append("g")
   .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-var nest = d3.nest()
-  .key(function(d) { return d.translation; });
+//var nest = d3.nest()
+//  .key(function(d) { return d.translation; });
 
 // Tooltip
 var tooltip = d3.select("body").append("div")
@@ -88,6 +89,7 @@ var tooltip = d3.select("body").append("div")
 
 // load data
 d3.csv(csvpath, function(error, data) {
+
   // Create array of column headers and map colors to them
   colors.domain(d3.keys(data[0]).filter(function(key) { return key !== "date"; }));
 
@@ -109,7 +111,7 @@ d3.csv(csvpath, function(error, data) {
     // Convert the range values to percentages
     pd.foodTypes.forEach(function(d) { d.yp0 /= y0; d.yp1 /= y0; });
     // Save the total
-    pd.totalfoodTypes = pd.foodTypes[pd.foodTypes.length - 1];//.y1;
+    pd.totalfoodTypes = pd.foodTypes[pd.foodTypes.length - 1].y1;
     // console.log(pd.totalfoodTypes);
   });
   // console.log(data);
@@ -159,6 +161,7 @@ d3.csv(csvpath, function(error, data) {
         .attr("style", "left:" + (mouse[0] + 20) + "px; top:" + (mouse[1] - 50) + "px")
         .html(tooltipText(d));
     })
+    .on("mouseover", selectBars(0.02))
     .on("mouseout", function(d, i) {
       tooltip.classed("hidden", true);
       tooltip.attr("stroke", "none");
@@ -355,19 +358,30 @@ d3.csv(csvpath, function(error, data) {
 
 });
 
+function selectBars(opacity) {
+  return function(d, i) {
+    var chosen = colors.domain()[i];
+    console.log(chosen);
+
+    d3.selectAll(".food-rect")
+      .filter(function(d) { return d.id === chosen; })
+      .style('opacity', '.5');
+  };
+  // continue here
+}
+
 function tooltipText(d) {
 
- return "<h4>" + d.name + "</h4>" +
+ return "<h5>" + d.name + "</h5>" +
    "<table>" +
    "<tr>" +
    "<td><strong>Count</strong>: " + (d.y1 - d.y0) + "</td>" +
    "</tr>"+
    "<tr>" +
-   // "<td><strong>Proportion</strong>: " + d3.format("%")((+d.y1 - +d.y0) / pd.totalfoodTypes) + "</td>" +
-   "</tr?>" +
+   "<td><strong>Proportion</strong>: " + d3.format("%")(d.yp1 - d.yp0) + "</td>" +
+   "</tr>" +
    "</table>";
 }
-
 
 // title case helper
 function toTitleCase(str) {

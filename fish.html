@@ -27,13 +27,430 @@
     </div>
   </div>
 
-  <div class="row">
-  <h3>Fish</h3>
-    <div class="small-12 columns" id="mainchart"></div>
-    <div class="small-12 columns" id="timechart"></div>
-  </div>
 </section>
 
-<script src="fish.js"></script>
+  <div class="row">
+    <div class="small-87 columns">
+    </div>
+    <div class="small-4 columns">
+      <select name="field-selector" id="field-selector"></select>
+    </div>
+  </div>
+
+  <div id="chart"></div>
+  <div class="small-12 columns" id="mainchart"></div>
+  <div class="small-12 columns" id="timechart"></div>
+
+<script type="text/javascript">
+
+var csvpath = "data/fish_transformed.csv";
+
+var legend_width = 120;
+
+var margin = {top: 20, right: 20, bottom: 30, left: 60},
+    width = 860 - margin.left - margin.right+legend_width,
+    height = 500 - margin.top - margin.bottom,
+    time_chart_height = 150 - margin.top - margin.bottom;
+
+var xscale = d3.scale.ordinal()
+  .rangeRoundBands([0, width], .1);
+
+var yscale = d3.scale.linear()
+  .rangeRound([height, 0]);
+
+var colors = d3.scale.ordinal()
+    .range(["#1f77b4","#aec7e8","#ff7f0e","#ffbb78","#2ca02c","#98df8a","#d62728","#ff9896","#9467bd","#c5b0d5","#8c564b","#c49c94","#e377c2","#f7b6d2","#7f7f7f","#c7c7c7","#bcbd22","#dbdb8d","#17becf","#9edae5","#393b79","#5254a3","#6b6ecf","#9c9ede","#637939","#8ca252","#b5cf6b","#cedb9c","#8c6d31","#bd9e39","#e7ba52","#e7cb94","#843c39","#ad494a","#d6616b","#e7969c","#7b4173","#a55194","#ce6dbd","#de9ed6"]);
+
+var xaxis = d3.svg.axis()
+  .scale(xscale)
+  .orient("bottom");
+
+var yaxis = d3.svg.axis()
+  .scale(yscale)
+  .orient("left")
+  .tickFormat(d3.format(".0%"));
+
+var svg = d3.select("#mainchart").append("svg")
+  .attr("width", width + margin.left + margin.right + legend_width)
+  .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+  .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+// load data
+d3.csv(csvpath, function(error, data) {
+  // Create array of column headers and map colors to them
+  colors.domain(d3.keys(data[0]).filter(function(key) { return key !== "date"; }));
+
+  data.forEach(function(d) {
+    var y0 = 0;
+    d.foods = colors.domain().map(function(name) { return {name: name, y0: y0, y1: y0 += +d[name]}; });
+    d.all_foods = d.foods[d.foods.length -1].y1;
+  });
+
+  // Add a `foodTypes` parameter to each row as a percentage
+  data.forEach(function(pd) {
+    var y0 = 0;
+    // pd.foodTypes will be an array of objects with the column header
+    // and range of values
+    pd.foodTypes = colors.domain().map(function(response) {
+      var responseobj = {response: response, y0: y0, yp0: y0};
+      y0 += +pd[response];
+      responseobj.y1 = y0;
+      responseobj.yp1 = y0;
+      return responseobj;
+    });
+    // y0 is the sum of all the values in the row for a food foodCategory
+    // Convert the range values to percentages
+    pd.foodTypes.forEach(function(d) { d.yp0 /= y0; d.yp1 /= y0; });
+    // Save the total
+    pd.totalfoodTypes = pd.foodTypes[pd.foodTypes.length - 1].y1;
+  });
+
+  xscale.domain(data.map(function(d) { return d.date; }));
+
+  // x axis
+  svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xaxis)
+    .selectAll("text")
+    .attr("y", 5)
+    .attr("x", 7)
+    .attr("dy", ".35em")
+    .attr("transform", "rotate(65)")
+    .style("text-anchor", "start");
+
+  // y axis
+  svg.append("g")
+    .attr("class", "y axis")
+    .call(yaxis);
+
+  var foodCategory = svg.selectAll(".foodCategory")
+    .data(data)
+    .enter().append("g")
+    .attr("class", "foodCategory")
+    .attr("transform", function(d) { return "translate(" + xscale(d.date) + ",0)"; });
+
+  // Draw rects within groups
+  foodCategory.selectAll("rect")
+    .data(function(d) { return d.foodTypes; })
+    .enter().append("rect")
+    .attr("width", xscale.rangeBand())
+    .attr("y", function(d) { return yscale(d.yp1); })
+    .attr("height", function(d) { return yscale(d.yp0) - yscale(d.yp1); })
+    .style("fill", function(d) { return colors(d.response); });
+
+  // Legend
+    var legend = svg.selectAll(".legend")
+      .data(colors.domain().slice().reverse())
+    .enter().append("g")
+      .attr("class", "legend")
+      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+    legend.append("rect")
+      .attr("x", width - 18 + legend_width)
+      .attr("width", 18)
+      .attr("height", 18)
+      .attr("fill", colors);
+      // .on("click", function(){
+      //   // Determine if current line is visible
+      //   var active   = d.active ? false : true,
+      //   newOpacity = active ? 0 : 1;
+      //   // Hide or show the elements based on the ID
+      //   d3.select(this + d.key.replace(/\s+/g, ''))
+      //       .transition().duration(100)
+      //       .style("opacity", newOpacity);
+      //   // Update whether or not the elements are active
+      //   d.active = active;
+      // });
+
+    legend.append("text")
+      .attr("x", width - 24 + legend_width)
+      .attr("y", 9)
+      .attr("dy", ".35em")
+      .style("text-anchor", "end")
+      .text(function(d) { return d; });
+
+  // Animation and selection
+  d3.selectAll("input").on("change", fieldSelected);
+
+  function fieldSelected() {
+    field = fieldSelector.node().value;
+    if (this.value === "barchartNormalized") {
+      transitionPercent();
+    } else if (this.value === "barchartAmount") {
+      transitionCount();
+    } else if (this.value === "linechartLog") {
+      transitionLog();
+    } else if (this.value === "linechartAmount") {
+      transitionLine();
+    } else {
+      showTable();
+    }
+  }
+
+  // Transition to 'normalized'
+  function transitionPercent() {
+    d3.select("svg").style("display", "block");
+    d3.select("#timechart").style("display","block");
+    d3.selectAll(".foodCategory").style("display", "block");
+    d3.selectAll(".foodLine").style("display","none");
+    d3.selectAll(".tabulate").style("display","none");
+
+    // reset the yscale domain to default
+    yscale.domain([0, 1]);
+
+    // create the transition
+    var trans = svg.transition().duration(250);
+
+    // transition the bars
+    var categories = trans.selectAll(".foodCategory");
+    categories.selectAll("rect")
+      .attr("y", function(d) { return yscale(d.yp1); })
+      .attr("height", function(d) { return yscale(d.yp0) - yscale(d.yp1); });
+
+    // change the y-axis
+    // set the y axis tick format
+    yaxis.tickFormat(d3.format(".0%"));
+    svg.selectAll(".y.axis").call(yaxis);
+  }
+
+  // Transition to 'count'
+  function transitionCount() {
+    d3.select("svg").style("display", "block");
+    d3.select("#timechart").style("display","block");
+    d3.selectAll(".foodCategory").style("display","block");
+    d3.selectAll(".foodLine").style("display","none");
+    d3.selectAll(".tabulate").style("display","none");
+
+    // set the yscale domain
+    yscale.domain([0, d3.max(data, function(d) { return d.totalfoodTypes; })]);
+
+    // create the transition
+    var transone = svg.transition()
+      .duration(250);
+
+    // transition the bars (step one)
+    var categoriesone = transone.selectAll(".foodCategory");
+    categoriesone.selectAll("rect")
+      .attr("y", function(d) { return this.getBBox().y + this.getBBox().height - (yscale(d.y0) - yscale(d.y1)) })
+      .attr("height", function(d) { return yscale(d.y0) - yscale(d.y1); });
+
+    // transition the bars (step two)
+    var transtwo = transone.transition()
+      .delay(500)
+      .duration(350)
+      .ease("bounce");
+    var categoriestwo = transtwo.selectAll(".foodCategory");
+    categoriestwo.selectAll("rect")
+      .attr("y", function(d) { return yscale(d.y1); });
+
+    // change the y-axis
+    // set the y axis tick format
+    yaxis.tickFormat(d3.format(".2s"));
+    svg.selectAll(".y.axis").call(yaxis);
+  }
+
+  function transitionLine() {
+    d3.select("svg").style("display", "block");
+    d3.select("#timechart").style("display","block");
+    d3.selectAll(".tabulate").style("display","none");
+    d3.selectAll(".foodCategory").style("display","none");
+    d3.selectAll(".foodLine").style("display","block");
+
+    d3.csv(csvpath, function(error, data) {
+      colors.domain(d3.keys(data[0]).filter(function(key) { return key !== "date"; }));
+
+      data.forEach(function(d) {
+        d.date = d.date;
+      });
+
+      var foods = colors.domain().map(function(name) {
+        return {
+          name: name,
+          values: data.map(function(d) {
+            return {date: d.date, amount: +d[name]};
+          })
+        };
+      });
+
+      xscale.domain(data.map(function(d) { return d.date; }));
+
+      yscale.domain([
+        d3.min(foods, function(c) { return d3.min(c.values, function(v) { return v.amount; }); }),
+        d3.max(foods, function(c) { return d3.max(c.values, function(v) { return v.amount; }); })
+      ]);
+
+      var line = d3.svg.line()
+          .interpolate("linear")
+          .x(function(d) { return xscale(d.date); })
+          .y(function(d) { return yscale(d.amount); });
+
+      var fooditem = svg.selectAll(".foodLine")
+          .data(foods)
+        .enter().append("g")
+          .attr("class", "foodLine");
+
+      fooditem.append("path")
+          .attr("class", "line")
+          .attr("d", function(d) { return line(d.values); })
+          .style("stroke", function(d) { return colors(d.name); });
+
+      fooditem.append("text")
+          .datum(function(d) { return {name: d.name, value: d.values[d.values.length - 1]}; })
+          .attr("transform", function(d) { return "translate(" + xscale(d.value.date) + "," + yscale(d.value.amount) + ")"; })
+          .attr("x", 3)
+          .attr("dy", ".35em");
+    });
+  }
+
+  function showTable() {
+    d3.selectAll(".foodCategory").style("display","none");
+    d3.selectAll(".foodLine").style("display","none");
+    d3.selectAll(".tabulate").style("display","block");
+    d3.select("#timechart").style("display","none");
+    d3.select("svg").style("display", "none");
+    d3.select("table").remove();
+
+    function tabulate(data, columns) {
+        var table = d3.select("#mainchart").append("table").attr("class","tabulate"),
+            thead = table.append("thead"),
+            tbody = table.append("tbody");
+
+        // append header row
+        thead.append("tr")
+            .selectAll("th")
+            .data(columns)
+            .enter()
+            .append("th")
+            .text(function(column) { return column; });
+
+        // create a row for each object in the data
+        var rows = tbody.selectAll("tr")
+            .data(data)
+          .enter().append("tr");
+
+        // create a cell in each row for each column
+        var cells = rows.selectAll("td")
+            .data(function(row) {
+                return columns.map(function(column) {
+                    return {column: column, value: row[column]};
+                });
+            })
+            .enter()
+            .append("td")
+            .html(function(d) { return d.value; });
+
+        return table;
+    }
+
+    // render the table
+     var foodTable = tabulate(data, ["date","Atlantic herring","burpot","carp","chameleon loach","cod","Commonäroach","Coregonusälavaretus","dried äääää","dried carp","dried eel","dried lamprey","Dried roe","dried salmon","dried white bream","dried zander","fish guts","Flounder","Gudgeon","Haddock","half dried white bream","half-smoked salmon","jellied eel","lamprey","oysters","perch","pickled carp","pickled eel","pickled Gudgeon","pickled herring","pickled lamprey","pickled pike","pickled salmon","pickled sturgeon","pickled zander","pike","preserved sturgeon","salmon","salmon trout","salted cod","sardines","smoked fish","Speißfische","spiced Gudgeon","sturgeon","Tench","turbot","Unclear","various small fish","Wels catfish","Zander"]);
+  }
+
+  var foodMenu = {
+    "barchartNormalized": {
+      "field": "barchartNormalized",
+      "label": "Barchart (Normalized)"
+    },
+    "barchartAmount": {
+      "field": "barchartAmount",
+      "label": "Barchart (Count)"
+    },
+    "linechartLog": {
+      "field": "linechartLog",
+      "label": "Line Chart (Logarithmic) NOT WORKING"
+    },
+    "linechartAmount": {
+      "field": "linechartAmount",
+      "label": "Line Chart (Count)"
+    },
+    "table": {
+      "field": "table",
+      "label": "Tabulated Data HALF WORKING" // embed in frame to scroll
+    }
+  };
+
+  // Selector fields
+  var fieldSelector = d3.select("#field-selector")
+    .on("change", fieldSelected);
+
+  for (var key in foodMenu) {
+    fieldSelector.append("option")
+    .attr("value", key)
+    .text(foodMenu[key].label);
+  }
+
+});
+
+/* *********************************************************************
+ * Time chart
+ */
+ var time_scale_x = d3.scale.ordinal()
+     .rangeRoundBands([0, width], .1);
+
+ var time_scale_y = d3.scale.linear()
+     .range([time_chart_height, 0]);
+
+ var time_x_axis = d3.svg.axis()
+     .scale(time_scale_x)
+     .orient("bottom");
+
+ var time_y_axis = d3.svg.axis()
+     .scale(time_scale_y)
+     .orient("left")
+     .ticks(10, "%");
+
+ var chart_svg = d3.select("#timechart").append("svg")
+     .attr("width", width + margin.left + margin.right)
+     .attr("height", time_chart_height + margin.top + margin.bottom)
+   .append("g")
+     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv("data/visit_percentage.csv", type, function(error, timechart) {
+  time_scale_x.domain(timechart.map(function(d) { return d.year; }));
+  time_scale_y.domain([0, d3.max(timechart, function(d) { return d.perc_year; })]);
+
+  chart_svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + time_chart_height + ")")
+      .call(time_x_axis)
+    .selectAll("text")
+      .attr("y", 0)
+      .attr("x", 9)
+      .attr("dy", ".35em")
+      .attr("transform", "rotate(90)")
+      .style("text-anchor", "start");
+
+  chart_svg.append("g")
+    .attr("class", "y axis")
+  .call(time_y_axis)
+    .append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 6)
+    .attr("dy", ".71em")
+    .style("text-anchor", "end")
+    .text("% of time at court");
+
+  chart_svg.selectAll(".bar")
+    .data(timechart)
+  .enter().append("rect")
+    .attr("class", "bar")
+    .attr("x", function(d) { return time_scale_x(d.year); })
+    .attr("width", time_scale_x.rangeBand())
+    .attr("y", function(d) { return time_scale_y(d.perc_year); })
+    .attr("height", function(d) { return time_chart_height - time_scale_y(d.perc_year); })
+    .style("fill", "steelblue");
+});
+
+function type(d) {
+  d.perc_year = +d.perc_year;
+  return d;
+}
+
+// d3.select(self.frameElement).style("height", (height + margin.top + margin.bottom) + "px");
+
+</script>
+
 </body>
 </html>
