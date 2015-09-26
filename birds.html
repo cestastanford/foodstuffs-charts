@@ -26,7 +26,7 @@
 <section>
   <div class="row">
     <div class="small-12 columns">
-      <h2>Foodstuffs, 1640&ndash;1688</h2>
+      <h2>Foodstuffs | Birds, 1640&ndash;1688</h2>
     </div>
   </div>
 
@@ -41,11 +41,11 @@
   </div>
 
   <div class="small-12 columns" id="mainchart"></div>
-  <div class="legend" id="legend"></div>
+  <!-- <div class="legend" id="legend"></div> -->
   <div class="small-12 columns" id="timechart"></div>
 
 <script>
-var csvpath = "/data/birds_transformed.csv";
+// var csvpath = "/data/birds_transformed.csv";
 
 var legendWidth = 120;
 
@@ -79,6 +79,14 @@ var svg = d3.select("#mainchart").append("svg")
   .append("g")
   .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+var loadingText = svg.append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 32)
+        .attr("class","loading-text")
+        .text('Loading...');
+
 //var nest = d3.nest()
 //  .key(function(d) { return d.translation; });
 
@@ -88,7 +96,10 @@ var tooltip = d3.select("body").append("div")
   .classed("hidden", true);
 
 // load data
-d3.csv(csvpath, function(error, data) {
+d3.csv("/data/birds_transformed.csv", function(error, data) {
+
+  loadingText.transition()
+        .remove();
 
   // Create array of column headers and map colors to them
   colors.domain(d3.keys(data[0]).filter(function(key) { return key !== "date"; }));
@@ -145,57 +156,91 @@ d3.csv(csvpath, function(error, data) {
   foodCategory.selectAll("rect")
     .data(function(d) { return d.foodTypes; })
   .enter().append("rect")
-    .attr("class","food-rect")
-    .attr("id", function(d) { return d.name; })
+    .attr("class", function(d) { return d.name; })
+    .attr("id", "food-rect")
     .attr("width", xscale.rangeBand())
     .attr("y", function(d) { return yscale(d.yp1); })
     .attr("height", function(d) { return yscale(d.yp0) - yscale(d.yp1); })
     .style("fill", function(d) { return colors(d.name); });
+
+  // foodCategory.selectAll("rect")
+  //   .data(function(d) { return d.totalfoodTypes; })
+  // .enter().append("rect")
+  //   .
+  //   .attr("class","null-data")
+
+  foodCategory.selectAll("rect")
+    .data(function(d) { return d.totalfoodTypes; })
+  .enter().append("rect")
+    .attr("height", function(p) { return p.totalfoodTypes === 0 ? 100 : yscale(p.totalfoodTypes); })
+    .attr("width", xscale.rangeBand())
+    .attr("y", function(p) { return p.totalfoodTypes === 0 ? 0 : height - yscale(p.totalfoodTypes); })
+    .attr("class", "zero_items")
+    .style("fill","gray");
 
   foodCategory.selectAll("rect")
     .on("mousemove", function(d, i) {
       var mouse = d3.mouse(d3.select("body").node());
       tooltip
         .classed("hidden", false)
-        .attr("stroke","red")
         .attr("style", "left:" + (mouse[0] + 20) + "px; top:" + (mouse[1] - 50) + "px")
         .html(tooltipText(d));
     })
-    .on("mouseover", selectBars(0.02))
+    .on("mouseover", function(d) {
+      selectBars(d.name);
+    })
     .on("mouseout", function(d, i) {
       tooltip.classed("hidden", true);
       tooltip.attr("stroke", "none");
+      selectBars(null);
     });
 
+    // console.log(data);
+
+
+    //   .data(function(d) { return d.foodTypes; })
+    // .enter().append("rect")
+    //   .attr("id", "null-data")
+    //   .attr("width", xscale.rangeBand())
+    //   .attr("y", function(d) { return d.y0 === 0 ? 0 : height; })
+    //   .attr("height", function(d) { return d.y0 === 0 ? 0 : height; })
+    //   .style("fill", "gray");
+
+          // .attr("height", function(p) { return p.totals == 0 ? 100 : y(p.totals)})
+          // .attr("width", 5)
+          // .attr("x", function(p, q) { return x(p.date)})
+          // .attr("y", function(p) { return p.totals == 0 ? 0 : height - y(p.totals)})
+          // .attr("class", "zero_items")
+
     // Legend
-    var svg2 = d3.select("#legend").append("svg")
-      .attr("width", 30)
-      .attr("height", 20 * data.length);
+    // var svg2 = d3.select("#legend").append("svg")
+    //   .attr("width", 30)
+    //   .attr("height", 20 * data.length);
 
-    var legend = svg2.selectAll(".legend")
-      .data(colors.domain().slice())
-    .enter().append("g")
-      .attr("class", "legend")
-      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+    // var legend = svg2.selectAll(".legend")
+    //   .data(colors.domain().slice())
+    // .enter().append("g")
+    //   .attr("class", "legend")
+    //   .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
 
-    legend.append("rect")
-      .attr("x", width - 18 + legendWidth)
-      .attr("width", 18)
-      .attr("height", 18)
-      .attr("fill", colors)
-      .on("mouseover", function(d, i) {
-        svg.selectAll("#black grouse").style("stroke", "red").style("stroke-width","2px");
-      })
-      .on("mouseout", function(d, i) {
-        svg.selectAll("#black grouse").style("stroke", "none");
-      });
+    // legend.append("rect")
+    //   .attr("x", width - 18 + legendWidth)
+    //   .attr("width", 18)
+    //   .attr("height", 18)
+    //   .attr("fill", colors)
+    //   .on("mouseover", function(d, i) {
+    //     svg.selectAll("#black grouse").style("stroke", "red").style("stroke-width","2px");
+    //   })
+    //   .on("mouseout", function(d, i) {
+    //     svg.selectAll("#black grouse").style("stroke", "none");
+    //   });
 
-    legend.append("text")
-      .attr("x", width - 24 + legendWidth)
-      .attr("y", 9)
-      .attr("dy", ".35em")
-      .style("text-anchor", "end")
-      .text(function(d) { return d; });
+    // legend.append("text")
+    //   .attr("x", width - 24 + legendWidth)
+    //   .attr("y", 9)
+    //   .attr("dy", ".35em")
+    //   .style("text-anchor", "end")
+    //   .text(function(d) { return d; });
 
   // Animation and selection
   d3.selectAll("input").on("change", fieldSelected);
@@ -356,18 +401,38 @@ d3.csv(csvpath, function(error, data) {
     .text(foodMenu[key].label);
   }
 
+  // // Sorting the values
+  // d3.select("input").on("change", change);
+
+  // function change() {
+  //   // Copy-on-write since tweens are evaluated after a delay.
+  //   var x0 = xscale.domain(data.sort(this.checked
+  //       ? function(a, b) { return b.date - a.date; }
+  //       : function(a, b) { return d3.ascending(a.amount, b.amount); })
+  //       .map(function(d) { return d.amount; }))
+  //       .copy();
+
+  //   svg.selectAll(".bar")
+  //       .sort(function(a, b) { return x0(a.amount) - x0(b.amount); });
+
+  //   var transition = svg.transition().duration(750),
+  //       delay = function(d, i) { return i * 50; };
+
+  //   transition.selectAll("rect")
+  //       .delay(delay)
+  //       .attr("x", function(d) { return x0(d.amount); });
+
+  //   transition.select(".x.axis")
+  //       .call(xaxis)
+  //     .selectAll("g")
+  //       .delay(delay);
+  // }
+
 });
 
-function selectBars(opacity) {
-  return function(d, i) {
-    var chosen = colors.domain()[i];
-    console.log(chosen);
-
-    d3.selectAll(".food-rect")
-      .filter(function(d) { return d.id === chosen; })
-      .style('opacity', '.5');
-  };
-  // continue here
+function selectBars(type) {
+  if (type == null) d3.selectAll("#food-rect").style("opacity","1.0");
+  else d3.selectAll("#food-rect" + "." + type).style("opacity", (type !== type) ? "1" : "0.4");
 }
 
 function tooltipText(d) {

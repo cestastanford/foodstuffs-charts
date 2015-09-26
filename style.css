@@ -39,10 +39,18 @@ form {
   top: 10px;
 }
 
+.loading-text{
+  font-size: 28px;
+}
+
 .hidden {
   display: none;
   visibility: hidden;
   pointer-events: none;
+}
+
+rect.active {
+  fill: red;
 }
 
 .tooltip {
@@ -67,6 +75,10 @@ form {
 
 .tooltip p {
   font-size: 0.80rem;
+}
+
+.null-data {
+  fill: gray;
 }
 
 .axis path,
