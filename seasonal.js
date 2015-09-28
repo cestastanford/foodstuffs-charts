@@ -1,95 +1,106 @@
-var margin_timeline = {top: 20, right: 20, bottom: 30, left: 60},
-    width_timeline = 1010 - margin_timeline.left - margin_timeline.right,
-    height_timeline = 90 - margin_timeline.top - margin_timeline.bottom;
+var parseDate = d3.time.format("%Y").parse,
+    formatYear = d3.format("02d"),
+    formatDate = function(d) { return formatYear(d.getFullYear()); };
 
-// var formatPercent = d3.format(".0%");
+var timeline_margin = {top: 10, right: 20, bottom: 20, left: 60},
+    timeline_width = 960 - timeline_margin.left - timeline_margin.right,
+    timeline_height = 500 - timeline_margin.top - timeline_margin.bottom;
 
-// var color = d3.scale.linear()
-//   .range(["#ca0020","#f4a582","#f7f7f7","#92c5de","#0571b0"])
-//   .domain([0,0.2,0.4,0.6,0.8]);
-var y0 = d3.scale.ordinal()
-    .rangeRoundBands([height_timeline, 0], .2);
+var timeline_y0 = d3.scale.ordinal()
+    .rangeRoundBands([timeline_height, 0], .2);
 
-var x_timeline = d3.scale.ordinal()
-  .rangeRoundBands([0, width_timeline], 0.1);
+var timeline_y1 = d3.scale.linear();
 
-var y_timeline = d3.scale.linear()
-    .range([height_timeline, 0]);
+var timeline_x = d3.scale.ordinal()
+    .rangeRoundBands([0, timeline_width], .1, 0);
 
-var xAxis_timeline = d3.svg.axis()
-    .scale(x_timeline)
-    .orient("bottom");
+var timeline_xAxis = d3.svg.axis()
+    .scale(timeline_x)
+    .orient("bottom")
+    .tickFormat(formatDate);
 
-var yAxis_timeline = d3.svg.axis()
-    .scale(y_timeline)
-    .orient("left")
-    .tickFormat(d3.format(".0%"));
+var timeline_nest = d3.nest()
+    .key(function(d) { return d.group; });
 
-// csv loaded asynchronously
-d3.csv("data/foods_t.csv", type, function(data) {
+var timeline_stack = d3.layout.stack()
+    .values(function(d) { return d.values; })
+    .x(function(d) { return d.date; })
+    .y(function(d) { return d.value; })
+    .out(function(d, timeline_y0) { d.valueOffset = timeline_y0; });
 
-  // Data is nested by season
-  var foods = d3.nest()
-      .key(function(d) { return d.season; })
-      .entries(data);
+var timeline_color = d3.scale.category10();
 
-  y0.domain(foods.map(function(d) { return d.key; }));
-
-  // Compute the minimum and maximum year and percent across symbols.
-  x_timeline.domain(data.map(function(d) { return d.year; }));
-  y_timeline.domain([0, d3.max(foods, function(s) { return s.values[0].percent; })]);
-
-  // Add an svg_timeline element for each season, with the desired dimensions and margin_timeline.
-  var svg_timeline = d3.select("#seasonal").append("svg")
-    .data(foods)
-  .enter().append("svg")
-    .attr("width", width_timeline + margin_timeline.left + margin_timeline.right)
-    .attr("height", height_timeline + margin_timeline.top + margin_timeline.bottom)
+var timeline_svg = d3.select("#timechart").append("svg")
+    .attr("width", timeline_width + timeline_margin.left + timeline_margin.right)
+    .attr("height", timeline_height + timeline_margin.top + timeline_margin.bottom)
   .append("g")
-    .attr("transform", "translate(" + margin_timeline.left + "," + margin_timeline.top + ")");
+    .attr("transform", "translate(" + timeline_margin.left + "," + timeline_margin.top + ")");
 
-  svg_timeline.filter(function(d, i) { return !i; }).append("g")
-      .attr("class", "x axis")
-      .attr("transform", "translate(0," + y0.rangeBand() + ")")
-      .call(xAxis_timeline)
-    .selectAll("text")
-      .attr("y", 0)
-      .attr("x", 9)
+d3.csv("data/season.csv", function(error, data) {
+
+  data.forEach(function(d) {
+    d.date = parseDate(d.date);
+    d.value = +d.value;
+  });
+
+  var dataByGroup = timeline_nest.entries(data);
+
+  timeline_stack(dataByGroup);
+  timeline_x.domain(dataByGroup[0].values.map(function(d) { return d.date; }));
+  timeline_y0.domain(dataByGroup.map(function(d) { return d.key; }));
+  timeline_y1.domain([0, d3.max(data, function(d) { return d.value; })]).range([timeline_y0.rangeBand(), 0]);
+
+  var group = timeline_svg.selectAll(".group")
+      .data(dataByGroup)
+    .enter().append("g")
+      .attr("class", "group")
+      .attr("transform", function(d) { return "translate(0," + timeline_y0(d.key) + ")"; });
+
+  group.append("text")
+      .attr("class", "group-label")
+      .attr("x", -6)
+      .attr("y", function(d) { return timeline_y1(d.values[0].value / 2); })
       .attr("dy", ".35em")
-      .attr("transform", "rotate(65)")
+      .text(function(d) { return d.key; });
+
+  group.selectAll("rect")
+      .data(function(d) { return d.values; })
+    .enter().append("rect")
+      .style("fill", function(d) { return timeline_color(d.group); })
+      .attr("x", function(d) { return timeline_x(d.date); })
+      .attr("y", function(d) { return timeline_y1(d.value); })
+      .attr("width", timeline_x.rangeBand())
+      .attr("height", function(d) { return timeline_y0.rangeBand() - timeline_y1(d.value); });
+
+  group.filter(function(d, i) { return !i; }).append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + timeline_y0.rangeBand() + ")")
+      .call(timeline_xAxis)
+    .selectAll("text")
+      .attr("y", 5)
+      .attr("x", 7)
+      .attr("dy", ".35em")
+      .attr("transform", "rotate(90)")
       .style("text-anchor", "start");
 
-  // svg_timeline.append("g")
-  //   .attr("class", "y axis")
-  //   .call(yAxis);
+  d3.selectAll("input").on("change", change);
 
-  svg_timeline.append("g")
-    .append("text")
-    .attr("x", width_timeline - 10)
-    .attr("y", height_timeline - 12)
-    .attr("dy", ".71em")
-    .attr("text-anchor", "end")
-    .attr("font-size", "1.1em")
-    .text(function(d) { return d.key; });
+  function change() {
+    if (this.value === "multiples") transitionMultiples();
+    else transitiontimeline_stacked();
+  }
 
-  svg_timeline.selectAll(".bar")
-      .data(function(d) {return d.values;})
-    .enter().append("rect")
-      .attr("class", "bar")
-      .attr("x", function(d) { return x_timeline(d.year); })
-      .attr("width", x_timeline.rangeBand())
-      .attr("y", function(d) { return y_timeline(d.percent); })
-      .attr("height", function(d) { return height_timeline - y_timeline(d.percent); })
-      .attr("fill", "steelblue");
+  function transitionMultiples() {
+    var t = timeline_svg.transition().duration(750),
+        g = t.selectAll(".group").attr("transform", function(d) { return "translate(0," + timeline_y0(d.key) + ")"; });
+    g.selectAll("rect").attr("y", function(d) { return timeline_y1(d.value); });
+    g.select(".group-label").attr("y", function(d) { return timeline_y1(d.values[0].value / 2); });
+  }
 
-  svg_timeline.selectAll(".bar")
-    .append("text")
-    .attr("class","bar-label")
-    .text(function(d) { return d.percent; });
-
+  function transitiontimeline_stacked() {
+    var t = timeline_svg.transition().duration(750),
+        g = t.selectAll(".group").attr("transform", "translate(0," + timeline_y0(timeline_y0.domain()[0]) + ")");
+    g.selectAll("rect").attr("y", function(d) { return timeline_y1(d.value + d.valueOffset); });
+    g.select(".group-label").attr("y", function(d) { return timeline_y1(d.values[0].value / 2 + d.values[0].valueOffset); });
+  }
 });
-
-function type(d) {
-  d.percent = +d.percent;
-  return d;
-}
