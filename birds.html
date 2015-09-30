@@ -37,8 +37,13 @@
     </div>
   </div>
 
+  <div class="row">
+    <div class="small-12 columns column-width-fix">
+      <div id="legend"></div>
+    </div>
+  </div>
+
   <div class="small-12 columns" id="mainchart"></div>
-  <!-- <div class="legend" id="legend"></div> -->
 
 <div class="row">
     <div class="small-12 columns">
@@ -83,6 +88,45 @@ var svg = d3.select("#mainchart").append("svg")
   .append("g")
   .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+// Timeline
+
+var formatYear = d3.format("02d"),
+    formatDate = function(d) { return formatYear(d.getFullYear()); };
+
+var timeline_margin = {top: 10, right: 20, bottom: 20, left: 60},
+    timeline_width = 980 - timeline_margin.left - timeline_margin.right,
+    timeline_height = 200 - timeline_margin.top - timeline_margin.bottom;
+
+var timeline_y0 = d3.scale.ordinal()
+    .rangeRoundBands([timeline_height, 0], .2);
+
+var timeline_y1 = d3.scale.linear();
+
+var timeline_x = d3.scale.ordinal()
+    .rangeRoundBands([0, timeline_width], .1, 0);
+
+var timeline_xAxis = d3.svg.axis()
+    .scale(timeline_x)
+    .orient("bottom")
+    .tickFormat(formatDate);
+
+var timeline_nest = d3.nest()
+    .key(function(d) { return d.group; });
+
+var timeline_stack = d3.layout.stack()
+    .values(function(d) { return d.values; })
+    .x(function(d) { return d.date; })
+    .y(function(d) { return d.value; })
+    .out(function(d, timeline_y0) { d.valueOffset = timeline_y0; });
+
+var timeline_color = d3.scale.category20();
+
+var timeline_svg = d3.select("#timechart").append("svg")
+    .attr("width", timeline_width + timeline_margin.left + timeline_margin.right)
+    .attr("height", timeline_height + timeline_margin.top + timeline_margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + timeline_margin.left + "," + timeline_margin.top + ")");
+
 var loadingText = svg.append('text')
         .attr('x', width / 2)
         .attr('y', height / 2)
@@ -91,8 +135,13 @@ var loadingText = svg.append('text')
         .attr("class","loading-text")
         .text('Loading...');
 
-//var nest = d3.nest()
-//  .key(function(d) { return d.translation; });
+var loadingTextTimeline = timeline_svg.append('text')
+        .attr('x', timeline_width / 2)
+        .attr('y', timeline_height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 24)
+        .attr("class","loading-text")
+        .text('Loading...');
 
 // Tooltip
 var tooltip = d3.select("body").append("div")
@@ -100,10 +149,12 @@ var tooltip = d3.select("body").append("div")
   .classed("hidden", true);
 
 // load data
-d3.csv("/data/birds_transformed.csv", function(error, data) {
+d3.csv(csvpath, function(error, data) {
 
   loadingText.transition()
         .remove();
+
+    // console.log(d3.keys(data[0]));
 
   // Create array of column headers and map colors to them
   colors.domain(d3.keys(data[0]).filter(function(key) { return key !== "date"; }));
@@ -129,7 +180,7 @@ d3.csv("/data/birds_transformed.csv", function(error, data) {
     pd.totalfoodTypes = pd.foodTypes[pd.foodTypes.length - 1].y1;
     // console.log(pd.totalfoodTypes);
   });
-  // console.log(data);
+  console.log(data);
 
   xscale.domain(data.map(function(d) { return d.date; }));
 
@@ -167,20 +218,6 @@ d3.csv("/data/birds_transformed.csv", function(error, data) {
     .attr("height", function(d) { return yscale(d.yp0) - yscale(d.yp1); })
     .style("fill", function(d) { return colors(d.name); });
 
-  // foodCategory.selectAll("rect")
-  //   .data(function(d) { return d.totalfoodTypes; })
-  // .enter().append("rect")
-  //   .
-  //   .attr("class","null-data")
-
-  foodCategory.selectAll("rect")
-    .data(function(d) { return d.totalfoodTypes; })
-  .enter().append("rect")
-    .attr("height", function(p) { return p.totalfoodTypes === 0 ? 100 : yscale(p.totalfoodTypes); })
-    .attr("width", xscale.rangeBand())
-    .attr("y", function(p) { return p.totalfoodTypes === 0 ? 0 : height - yscale(p.totalfoodTypes); })
-    .attr("class", "zero_items")
-    .style("fill","gray");
 
   foodCategory.selectAll("rect")
     .on("mousemove", function(d, i) {
@@ -199,52 +236,35 @@ d3.csv("/data/birds_transformed.csv", function(error, data) {
       selectBars(null);
     });
 
-    // console.log(data);
+  // Legend
+  //-----------------------------------------------------
+  var legend_data = d3.select("#legend")
+    .html("")
+    .selectAll(".legend-row")
+    .data(colors.domain().slice());
 
+  var legend = legend_data
+    .enter().append("div")
+      .attr("id", function(d) { return d.split(' ').join('_'); });
 
-    //   .data(function(d) { return d.foodTypes; })
-    // .enter().append("rect")
-    //   .attr("id", "null-data")
-    //   .attr("width", xscale.rangeBand())
-    //   .attr("y", function(d) { return d.y0 === 0 ? 0 : height; })
-    //   .attr("height", function(d) { return d.y0 === 0 ? 0 : height; })
-    //   .style("fill", "gray");
+  legend.append("span")
+    .style("background", function(d) { return colors(d); })
+    .attr("class","color-bar");
 
-          // .attr("height", function(p) { return p.totals == 0 ? 100 : y(p.totals)})
-          // .attr("width", 5)
-          // .attr("x", function(p, q) { return x(p.date)})
-          // .attr("y", function(p) { return p.totals == 0 ? 0 : height - y(p.totals)})
-          // .attr("class", "zero_items")
+    legend
+      .attr("class", "legend-row");
 
-    // Legend
-    // var svg2 = d3.select("#legend").append("svg")
-    //   .attr("width", 30)
-    //   .attr("height", 20 * data.length);
+  legend
+    .append("span")
+    .text(function(d,i) { return " " + d; });
 
-    // var legend = svg2.selectAll(".legend")
-    //   .data(colors.domain().slice())
-    // .enter().append("g")
-    //   .attr("class", "legend")
-    //   .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
-
-    // legend.append("rect")
-    //   .attr("x", width - 18 + legendWidth)
-    //   .attr("width", 18)
-    //   .attr("height", 18)
-    //   .attr("fill", colors)
-    //   .on("mouseover", function(d, i) {
-    //     svg.selectAll("#black grouse").style("stroke", "red").style("stroke-width","2px");
-    //   })
-    //   .on("mouseout", function(d, i) {
-    //     svg.selectAll("#black grouse").style("stroke", "none");
-    //   });
-
-    // legend.append("text")
-    //   .attr("x", width - 24 + legendWidth)
-    //   .attr("y", 9)
-    //   .attr("dy", ".35em")
-    //   .style("text-anchor", "end")
-    //   .text(function(d) { return d; });
+  legend
+    .on("mouseover", function(d) {
+      selectBars(d);
+    })
+    .on("mouseout", function(d, i) {
+      selectBars(null);
+    });
 
   // Animation and selection
   d3.selectAll("input").on("change", fieldSelected);
@@ -284,6 +304,7 @@ d3.csv("/data/birds_transformed.csv", function(error, data) {
     // set the y axis tick format
     yaxis.tickFormat(d3.format(".0%"));
     svg.selectAll(".y.axis").call(yaxis);
+
   }
 
   // Transition to 'count'
@@ -405,38 +426,13 @@ d3.csv("/data/birds_transformed.csv", function(error, data) {
     .text(foodMenu[key].label);
   }
 
-  // // Sorting the values
-  // d3.select("input").on("change", change);
-
-  // function change() {
-  //   // Copy-on-write since tweens are evaluated after a delay.
-  //   var x0 = xscale.domain(data.sort(this.checked
-  //       ? function(a, b) { return b.date - a.date; }
-  //       : function(a, b) { return d3.ascending(a.amount, b.amount); })
-  //       .map(function(d) { return d.amount; }))
-  //       .copy();
-
-  //   svg.selectAll(".bar")
-  //       .sort(function(a, b) { return x0(a.amount) - x0(b.amount); });
-
-  //   var transition = svg.transition().duration(750),
-  //       delay = function(d, i) { return i * 50; };
-
-  //   transition.selectAll("rect")
-  //       .delay(delay)
-  //       .attr("x", function(d) { return x0(d.amount); });
-
-  //   transition.select(".x.axis")
-  //       .call(xaxis)
-  //     .selectAll("g")
-  //       .delay(delay);
-  // }
-
 });
 
 function selectBars(type) {
-  if (type == null) d3.selectAll("#food-rect").style("opacity","1.0");
-  else d3.selectAll("#food-rect" + "." + type.split(' ').join('_')).style("opacity", (type.split(' ').join('_') !== type.split(' ').join('_')) ? "1" : "0.4");
+  if (type == null) d3.selectAll("#food-rect").style("opacity","1.0").style("stroke","none");
+  else d3.selectAll("#food-rect" + "." + type.split(' ').join('_'))
+    .style("stroke", (type.split(' ').join('_') !== type.split(' ').join('_')) ? "none" : "red")
+    .style("stroke-width", (type.split(' ').join('_') !== type.split(' ').join('_')) ? "none" : "3");
 }
 
 function tooltipText(d) {
@@ -457,46 +453,10 @@ function toTitleCase(str) {
     return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
 }
 
-// Timeline
-
-var formatYear = d3.format("02d"),
-    formatDate = function(d) { return formatYear(d.getFullYear()); };
-
-var timeline_margin = {top: 10, right: 20, bottom: 20, left: 60},
-    timeline_width = 980 - timeline_margin.left - timeline_margin.right,
-    timeline_height = 200 - timeline_margin.top - timeline_margin.bottom;
-
-var timeline_y0 = d3.scale.ordinal()
-    .rangeRoundBands([timeline_height, 0], .2);
-
-var timeline_y1 = d3.scale.linear();
-
-var timeline_x = d3.scale.ordinal()
-    .rangeRoundBands([0, timeline_width], .1, 0);
-
-var timeline_xAxis = d3.svg.axis()
-    .scale(timeline_x)
-    .orient("bottom")
-    .tickFormat(formatDate);
-
-var timeline_nest = d3.nest()
-    .key(function(d) { return d.group; });
-
-var timeline_stack = d3.layout.stack()
-    .values(function(d) { return d.values; })
-    .x(function(d) { return d.date; })
-    .y(function(d) { return d.value; })
-    .out(function(d, timeline_y0) { d.valueOffset = timeline_y0; });
-
-var timeline_color = d3.scale.category10();
-
-var timeline_svg = d3.select("#timechart").append("svg")
-    .attr("width", timeline_width + timeline_margin.left + timeline_margin.right)
-    .attr("height", timeline_height + timeline_margin.top + timeline_margin.bottom)
-  .append("g")
-    .attr("transform", "translate(" + timeline_margin.left + "," + timeline_margin.top + ")");
-
+// Timeline chart
 d3.csv("data/season.csv", function(error, data) {
+  loadingTextTimeline.transition()
+        .remove();
 
   data.forEach(function(d) {
     d.date = parseDate(d.date);

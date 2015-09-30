@@ -9,6 +9,10 @@
   fill: steelblue;
 }
 
+.column-width-fix {
+  width: 90%;
+}
+
 .x.axis path {
   display: none;
 }
@@ -18,7 +22,7 @@
   display: block;
 }
 
-.legend {
+/*.legend {
   overflow: auto;
   height: 200px;
   width: 50px;
@@ -27,7 +31,7 @@
 .legend line {
   stroke: #000;
   shape-rendering: crispEdges;
-}
+}*/
 
 text {
   font: 10px sans-serif;
@@ -114,4 +118,30 @@ td {
 tr {
   margin: 0;
   background-color: white;
+}
+
+#legend {
+  text-align: left;
+  overflow-y: auto;
+  width: 90%
+  margin: 0 auto;
+}
+.legend-row {
+  cursor: pointer;
+  float: left;      /* remove if returning to bar chart */
+  padding: 4px;     /* remove if returning to bar chart */
+  font-size: 10px;
+}
+.color-bar {
+  display: inline-block;
+  height: 8px;
+  width: 8px;
+  margin: 1px 4px 1px 0px;
+}
+.color-box {
+  display: inline-block;
+  height: 8px;
+  width: 8px;
+  margin: 4px 4px 4px 16px;
+  padding: 4px;
 }
